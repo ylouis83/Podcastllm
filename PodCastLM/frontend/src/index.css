@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.gBtwiJ .interface-grid {
+  background: rgba(249, 249, 249, 1) !important;
+}
+
+:root {
+  --rm-audio-player-interface-container: #fff;
+  --primary: 240 5.9% 10%;
+}
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --radius: 10px;
+  --input: 220deg 13.04% 90.98%;
+  --destructive: 0 72.22% 50.59%;
+  --destructive-foreground: 0 0% 98%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --input: 220deg 13.04% 90.98%;
+    --destructive: 0 72.22% 50.59%;
+    --destructive-foreground: 0 0% 98%;
+  }
+}
+
+.kuNzeN img {
+  border-radius: 100% !important;
+}
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.dots span {
+  animation: blink 1.4s infinite;
+  animation-fill-mode: both;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: .2s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: .4s;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
