@@ -84,7 +84,7 @@ export default function Audio({ audioUrl, isAudioLoading, audioError }: { audioU
               <div className="flex justify-end items-center mb-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                    <button aria-label="More options" className="p-2 rounded-full hover:bg-gray-200 transition-colors">
                       <MoreVertical className="w-5 h-5" />
                     </button>
                   </DropdownMenuTrigger>

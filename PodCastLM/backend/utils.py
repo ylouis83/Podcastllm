@@ -10,13 +10,13 @@ import json
 import logging
 from typing import Any, Dict, Generator, Optional
 import uuid
-from openai import OpenAI
+from openai import OpenAI, APIError
 import requests
 from fishaudio import fishaudio_tts
 from prompts import LANGUAGE_MODIFIER, LENGTH_MODIFIERS, PODCAST_INFO_PROMPT, QUESTION_MODIFIER, SUMMARY_INFO_PROMPT, SYSTEM_PROMPT, TONE_MODIFIER
 from pydub import AudioSegment
 from fastapi import UploadFile
-from PyPDF2 import PdfReader
+from PyPDF2 import PdfReader, errors
 from schema import PodcastInfo, ShortDialogue, Summary
 from constants import (
     AUDIO_CACHE_DIR,
@@ -36,10 +36,15 @@ from constants import (
 )
 import azure.cognitiveservices.speech as speechsdk
 import dashscope
+from diskcache import Cache
 from dashscope import MultiModalConversation, Generation
 fw_client = OpenAI(base_url=FIREWORKS_BASE_URL, api_key=FIREWORKS_API_KEY) if FIREWORKS_API_KEY else None
 logger = logging.getLogger(__name__)
 
+# Initialize disk cache
+PDF_CACHE_DIR = os.path.join(os.path.dirname(__file__), "tmp", "pdf_cache")
+os.makedirs(PDF_CACHE_DIR, exist_ok=True)
+pdf_cache = Cache(PDF_CACHE_DIR)
 
 
 def generate_dialogue(pdfFile, textInput, tone, duration, language) -> Generator[str, None, None]:
@@ -88,26 +93,24 @@ async def generate_podcast_audio_by_azure(text: str, voice: str) -> str:
         speech_config.speech_synthesis_voice_name = voice
 
         synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
-        future =await asyncio.to_thread(synthesizer.speak_text_async, text)
+        future = await asyncio.to_thread(synthesizer.speak_text_async, text)
         
         result = await asyncio.to_thread(future.get)
 
-        print("Speech synthesis completed")
-
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-            print("Audio synthesized successfully")
+            logger.info("Azure TTS audio synthesized successfully.")
             audio_data = result.audio_data
-            audio_segment = AudioSegment.from_wav(io.BytesIO(audio_data))
-            return audio_segment
+            return AudioSegment.from_wav(io.BytesIO(audio_data))
         else:
-            print(f"Speech synthesis failed: {result.reason}")
-            if hasattr(result, 'cancellation_details'):
-                print(f"Cancellation details: {result.cancellation_details.reason}")
-                print(f"Cancellation error details: {result.cancellation_details.error_details}")
+            cancellation_details = result.cancellation_details
+            logger.error(f"Azure TTS synthesis failed: {result.reason}")
+            if cancellation_details:
+                logger.error(f"Cancellation reason: {cancellation_details.reason}")
+                logger.error(f"Cancellation error details: {cancellation_details.error_details}")
             return None
 
     except Exception as e:
-        print(f"Error in generate_podcast_audio: {e}")
+        logger.error(f"Error in Azure TTS audio generation: {e}", exc_info=True)
         raise
 
 async def generate_podcast_audio(text: str, voice: str) -> str:
@@ -218,63 +221,7 @@ async def process_lines_with_limit(lines, provider , host_voice, guest_voice, la
     tasks = [limited_process_line(line) for line in lines]
     results = await asyncio.gather(*tasks)
     return results
-async def combine_audio(task_status: Dict[str, Dict], task_id: str, text: str, language: str , provider:str,host_voice: str , guest_voice:str) -> Generator[str, None, None]:
-    try:
-        dialogue_regex = r'\*\*([\s\S]*?)\*\*[:：]\s*([\s\S]*?)(?=\*\*|$)'
-        matches = re.findall(dialogue_regex, text, re.DOTALL)
-        
-        lines = [
-        {
-            "speaker": match[0],
-            "content": match[1].strip(),
-        }
-        for match in matches
-        ]
 
-        print("Starting audio generation")
-        # audio_segments = await asyncio.gather(
-        #     *[process_line(line, host_voice if line['speaker'] == '主持人' else guest_voice) for line in lines]
-        # )
-        if provider == 'azure':
-            concurrency = 10
-        elif provider == 'qwen':
-            concurrency = 1
-        else:
-            concurrency = 5
-        audio_segments = await process_lines_with_limit(lines,provider, host_voice, guest_voice, language, concurrency)
-        print("Audio generation completed")
-
-        # 合并音频
-        combined_audio = await asyncio.to_thread(sum, audio_segments)
-
-        print("Audio combined")
-
-        # 只在最后写入文件
-        unique_filename = f"{uuid.uuid4()}.mp3"
-
-        os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
-        file_path = os.path.join(AUDIO_CACHE_DIR, unique_filename)
-        
-        # 异步导出音频文件
-        await asyncio.to_thread(combined_audio.export, file_path, format="mp3")
-
-        audio_url = f"/audio/{unique_filename}"
-        task_status[task_id] = {"status": "completed", "audio_url": audio_url}
-
-        for file in glob.glob(f"{AUDIO_CACHE_DIR}*.mp3"):
-            if (
-                os.path.isfile(file)
-                and time.time() - os.path.getmtime(file) > GRADIO_CLEAR_CACHE_OLDER_THAN
-            ):
-                os.remove, file
-
-        
-        clear_pdf_cache()
-        return audio_url
-        
-    except Exception as e:
-        # 如果发生错误，更新状态为失败
-        task_status[task_id] = {"status": "failed", "error": str(e)}
 
 
 def generate_podcast_summary(pdf_content: str, text: str, tone: str, length: str, language: str) -> Generator[str, None, None]:
@@ -349,8 +296,8 @@ def call_llm_stream(system_prompt: str, text: str, dialogue_format: Any, isJSON:
                     full_response += content
                     yield content
             return
-        except Exception as e:
-            print(f"Error calling Fireworks LLM: {e}. Falling back to DashScope.")
+        except APIError as e:
+            logger.error(f"Error calling Fireworks LLM: {e}. Falling back to DashScope.", exc_info=True)
 
     if not BAILIAN_API_KEY:
         raise RuntimeError("未配置可用的 LLM API Key。")
@@ -410,8 +357,8 @@ def call_llm(system_prompt: str, text: str, dialogue_format: Any) -> Any:
                     "schema": dialogue_format.model_json_schema(),
                 },
             )
-        except Exception as e:
-            print(f"Error calling Fireworks LLM: {e}. Falling back to DashScope.")
+        except APIError as e:
+            logger.error(f"Error calling Fireworks LLM: {e}. Falling back to DashScope.", exc_info=True)
 
     if not BAILIAN_API_KEY:
         raise RuntimeError("未配置可用的 LLM API Key。")
@@ -429,31 +376,43 @@ def call_llm(system_prompt: str, text: str, dialogue_format: Any) -> Any:
         result_format="text",
     )
 
-pdf_cache = {}
-def clear_pdf_cache():
-    global pdf_cache
-    pdf_cache.clear()
-
 def get_link_text(url: str):
     """ 通过jina.ai 抓取url内容 """
     if not JINA_KEY:
         raise RuntimeError("JINA_KEY 未配置，无法抓取 URL。")
-    url  = f"https://r.jina.ai/{url}"
-    headers = {}
-    headers['Authorization'] = 'Bearer ' + JINA_KEY
-    headers['Accept'] = 'application/json'
-    headers['X-Return-Format'] = 'text'
-    response = requests.get(url, headers=headers)
-    return response.json()['data']
+    
+    request_url = f"https://r.jina.ai/{url}"
+    headers = {
+        'Authorization': f'Bearer {JINA_KEY}',
+        'Accept': 'application/json',
+        'X-Return-Format': 'text'
+    }
+    
+    try:
+        response = requests.get(request_url, headers=headers, timeout=30)
+        response.raise_for_status()  # Will raise an HTTPError for bad responses (4xx or 5xx)
+        
+        data = response.json()
+        if 'data' not in data:
+            raise ValueError("Jina API response did not contain 'data' field.")
+        return data['data']
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"抓取URL时发生网络错误: {e}", exc_info=True)
+        raise RuntimeError(f"无法抓取内容从 {url}。") from e
+    except (ValueError, KeyError) as e:
+        logger.error(f"解析Jina API响应时出错: {e}", exc_info=True)
+        raise RuntimeError("处理Jina API响应时出错。") from e
 
 async def get_pdf_text(pdf_file: UploadFile):
     try:
         contents = await pdf_file.read()
         file_hash = hashlib.md5(contents).hexdigest()
 
-        if file_hash in pdf_cache:
+        cached_text = pdf_cache.get(file_hash)
+        if cached_text:
             await pdf_file.seek(0)
-            return pdf_cache[file_hash]
+            return cached_text
 
         pdf_reader = PdfReader(io.BytesIO(contents))
 
@@ -470,12 +429,19 @@ async def get_pdf_text(pdf_file: UploadFile):
         if not text:
             return {"error": "未能从 PDF 中提取文本，请确认文件不是扫描件或受保护。"}
 
-        pdf_cache[file_hash] = text
+        pdf_cache.set(file_hash, text)
         return text
 
+    except errors.PdfReadError:
+        await pdf_file.seek(0)
+        return {"error": "无法解析PDF文件，文件可能已损坏或格式不正确。"}
+    except IOError:
+        await pdf_file.seek(0)
+        return {"error": "读取文件时发生I/O错误。"}
     except Exception as e:
         await pdf_file.seek(0)
-        return {"error": str(e)}
+        logger.error(f"处理PDF时发生未知错误: {e}", exc_info=True)
+        return {"error": "处理PDF时发生未知错误。"}
 
 def get_prompt(pdfContent: str, text: str, tone: str, length: str, language: str):
     modified_system_prompt = ""

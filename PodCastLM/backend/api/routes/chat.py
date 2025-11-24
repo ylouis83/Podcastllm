@@ -1,10 +1,8 @@
-import uuid
-from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile, File
+from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
-import json
-from typing import Dict, Optional
+from typing import Optional
 from constants import SPEEKERS
-from utils import combine_audio, generate_dialogue, generate_podcast_info, generate_podcast_summary, get_link_text, get_pdf_text
+from utils import generate_dialogue, generate_podcast_info, generate_podcast_summary, get_link_text, get_pdf_text
 try:
     from backend.services import get_transcription_service
 except ImportError:
@@ -141,44 +139,48 @@ async def get_pod_info(
     return StreamingResponse(generate_podcast_info(new_text, textInput, tone, duration, language), media_type="application/json")
 
 
-task_status: Dict[str, Dict] = {}
+
+
+
+from backend.tasks import combine_audio_task
 
 
 @router.post("/generate_audio")
-async def audio(
-    background_tasks: BackgroundTasks,
+async def generate_audio(
     text: str = Form(...),
     host_voice: str = Form(...),
     guest_voice: str = Form(...),
-    language: str = Form(...) ,
+    language: str = Form(...),
     provider: str = Form(...)
 ):  
-    task_id = str(uuid.uuid4())
-    task_status[task_id] = {"status": "processing"}
+    # Dispatch the Celery task
+    task = combine_audio_task.delay(text, language, provider, host_voice, guest_voice)
     
-    background_tasks.add_task(combine_audio, task_status, task_id, text, language,provider , host_voice,guest_voice)
+    # Return the task ID to the client
+    return JSONResponse(content={"task_id": task.id})
 
-    return JSONResponse(content={"task_id": task_id, "status": "processing"})
 
+from backend.celery_worker import celery_app
 
 @router.get("/audio_status/{task_id}")
 async def get_audio_status(task_id: str):
-    if task_id not in task_status:
-        raise HTTPException(status_code=404, detail="Task not found")
+    result = celery_app.AsyncResult(task_id)
     
-    status = task_status[task_id]
-    
-    if status["status"] == "completed":
+    if result.state == 'SUCCESS':
         return JSONResponse(content={
             "status": "completed",
-            "audio_url": status["audio_url"]
+            "audio_url": result.get()
         })
-    elif status["status"] == "failed":
+    elif result.state == 'FAILURE':
+        # It's good practice to not expose raw error messages to the client.
+        # Log the full error for debugging on the backend.
+        print(f"Task {task_id} failed with error: {result.get()}")
         return JSONResponse(content={
             "status": "failed",
-            "error": status["error"]
+            "error": "Audio generation failed. Please try again."
         })
     else:
+        # For states like PENDING, STARTED, RETRY
         return JSONResponse(content={
             "status": "processing"
         })
