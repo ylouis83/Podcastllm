@@ -25,7 +25,7 @@ SPEECH_KEY = os.getenv('SPEECH_KEY')
 SPEECH_REGION = "japaneast"
 
 FISHAUDIO_KEY = os.getenv('FISHAUDIO_KEY')
-JINA_KEY = os.getenv('JINA_KEY','jina_c1759c7f49e14ced990ac7776800dc44ShJNTXBCizzwjE7IMFYJ6LD960cG')
+JINA_KEY = os.getenv('JINA_KEY')
 BAILIAN_API_KEY = os.getenv('BAILIAN_API_KEY') or os.getenv('QWEN_API_KEY') or os.getenv('DASHSCOPE_API_KEY')
 DASHSCOPE_LLM_MODEL_ID = os.getenv('DASHSCOPE_LLM_MODEL_ID', 'qwen-turbo')
 DASHSCOPE_TEMPERATURE = float(os.getenv('DASHSCOPE_TEMPERATURE', '0.7'))

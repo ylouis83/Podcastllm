@@ -35,7 +35,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `FIREWORKS_API_KEY`（可选）：启用 Llama 3.1 405B（`FIREWORKS_MODEL_ID` 可覆盖）。
 - `SPEECH_KEY` / `SPEECH_REGION`：Azure TTS。
 - `FISHAUDIO_KEY`：FishAudio TTS。
-- `JINA_KEY`：URL 抓取，默认值可用但建议替换。
+- `JINA_KEY`：URL 抓取（必填，自行申请后填入）。
 - `WHISPER_MODEL_NAME`：Whisper 模型名，默认 `small`。
 - 其它可选：`DASHSCOPE_LLM_MODEL_ID`、`DASHSCOPE_TEMPERATURE`。
 

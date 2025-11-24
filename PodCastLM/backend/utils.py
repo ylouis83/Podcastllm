@@ -436,6 +436,8 @@ def clear_pdf_cache():
 
 def get_link_text(url: str):
     """ 通过jina.ai 抓取url内容 """
+    if not JINA_KEY:
+        raise RuntimeError("JINA_KEY 未配置，无法抓取 URL。")
     url  = f"https://r.jina.ai/{url}"
     headers = {}
     headers['Authorization'] = 'Bearer ' + JINA_KEY
