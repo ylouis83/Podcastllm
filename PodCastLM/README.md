@@ -1,7 +1,7 @@
 <h1 align="center">欢迎来到 PodCastLM 👋</h1>
 <p align="center">将 PDF / URL 转成播客对话，支持多路 TTS 与本地 Whisper 转写。</p>
 
-[English](/README_EN.md)
+[English](./README_EN.md)
 
 ## ✨ 示例
 - [demo.mp4](https://github.com/user-attachments/assets/ed846901-069e-48c5-8576-01b017cd581a)

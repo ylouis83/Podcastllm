@@ -23,3 +23,7 @@ httpx==0.25.2
 openai-whisper==20231117
 pytest==8.3.3
 python-dotenv==1.0.1
+diskcache
+celery
+redis
+fish_audio_sdk
