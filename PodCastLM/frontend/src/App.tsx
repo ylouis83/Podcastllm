@@ -2,18 +2,15 @@ import { useState } from "react";
 import Content from "./components/content";
 import Menu from "./components/menu";
 import { useJsonData } from "./hooks/useJsonData";
-import { useStreamText } from './hooks/useStreamText';
+import { useStreamText } from "./hooks/useStreamText";
 import { BASE_URL } from "./lib/constant";
 import MobileMenu from "./components/mobile-menu";
-import { Toaster } from "@/components/ui/toaster"
-import MuskCompensation from "./components/musk-compensation";
-import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/toaster";
 
 function App() {
-  const [view, setView] = useState<"podcast" | "musk">("musk"); // Default to musk view
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
-  const [activeTab, setActiveTab] = useState("summary")
+  const [activeTab, setActiveTab] = useState("summary");
 
   const {
     textChunks: summaryTextChunks,
@@ -30,7 +27,6 @@ function App() {
     isLoading: isPodInfoLoading,
     fetchJsonData: fetchPodInfo,
   } = useJsonData();
-
 
   const cloneFormData = (source: FormData) => {
     const target = new FormData();
@@ -61,43 +57,14 @@ function App() {
 
     fetchPodInfo(`${BASE_URL}/pod_info`, podInfoForm);
     fetchSummaryText(`${BASE_URL}/summarize`, summaryForm);
-  }
-  // View switcher component
-  const ViewSwitcher = () => (
-    <div className="fixed top-4 right-4 z-50 flex gap-2">
-      <Button
-        variant={view === "musk" ? "default" : "outline"}
-        onClick={() => setView("musk")}
-        className="text-sm"
-      >
-        马斯克薪酬计划
-      </Button>
-      <Button
-        variant={view === "podcast" ? "default" : "outline"}
-        onClick={() => setView("podcast")}
-        className="text-sm"
-      >
-        播客应用
-      </Button>
-    </div>
-  );
-
-  if (view === "musk") {
-    return (
-      <div className="min-h-screen">
-        <Toaster />
-        <ViewSwitcher />
-        <MuskCompensation />
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-       <Toaster />
-       <ViewSwitcher />
+      <Toaster />
       <main className="flex-grow flex bg-[rgb(245,245,245)] h-full">
-        <Menu className="hidden md:flex "
+        <Menu
+          className="hidden md:flex"
           handleGenerate={handleGenerate}
           isGenerating={isGenerating}
         />
@@ -115,10 +82,12 @@ function App() {
           formData={formData!}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          mobileMenu={<MobileMenu
-            handleGenerate={handleGenerate}
-            isGenerating={isGenerating}
-          />}
+          mobileMenu={
+            <MobileMenu
+              handleGenerate={handleGenerate}
+              isGenerating={isGenerating}
+            />
+          }
         />
       </main>
     </div>
@@ -126,3 +95,4 @@ function App() {
 }
 
 export default App;
+

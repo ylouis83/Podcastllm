@@ -8,7 +8,7 @@ from typing import Dict
 
 from backend.celery_worker import celery_app
 from backend.constants import AUDIO_CACHE_DIR, GRADIO_CLEAR_CACHE_OLDER_THAN
-from backend.utils import clear_pdf_cache, process_lines_with_limit
+from backend.utils import get_prompt, get_link_text, process_lines_with_limit, clear_pdf_cache
 
 
 @celery_app.task(bind=True)

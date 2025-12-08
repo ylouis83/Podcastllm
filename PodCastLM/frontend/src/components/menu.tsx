@@ -1,46 +1,45 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Link, FileText, Mic, Clock, Globe, Sparkles, AudioLines } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { useSpeeker } from '@/hooks/useSpeeker';
-import { Input } from './ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Upload, Link, FileText, Mic, Clock, Globe, Sparkles, AudioLines, Video } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { useSpeeker } from "@/hooks/useSpeeker";
+import { Input } from "./ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useToast } from "@/hooks/use-toast"
-import { BASE_URL } from '@/lib/constant';
+import { BASE_URL } from "@/lib/constant";
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 5MB in bytes
-const DEMO_PDF_URL = '/demo.pdf'; // 替换为你的演示 PDF 文件的实际路径
+const DEMO_PDF_URL = "/demo.pdf"; // 替换为你的演示 PDF 文件的实际路径
 
 export default function Menu({ handleGenerate, className, isGenerating }: { className?: string, handleGenerate: (formData: FormData) => void, isGenerating: boolean }) {
   const { toast } = useToast()
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [textInput, setTextInput] = useState('');
-  const [tone, setTone] = useState('neutral');
-  const [duration, setDuration] = useState('short');
-  const [language, setLanguage] = useState('Chinese');
-  const [hostVoice, setHostVoice] = useState('zh-CN-YunxiNeural');
-  const [guestVoice, setGuestVoice] = useState('zh-CN-YunzeNeural');
-  const [provider, setProvider] = useState('azure');
+  const [textInput, setTextInput] = useState("");
+  const [tone, setTone] = useState("neutral");
+  const [duration, setDuration] = useState("short");
+  const [language, setLanguage] = useState("Chinese");
+  const [hostVoice, setHostVoice] = useState("zh-CN-YunxiNeural");
+  const [guestVoice, setGuestVoice] = useState("zh-CN-YunzeNeural");
+  const [provider, setProvider] = useState("azure");
   const [fileError, setFileError] = useState<string | null>(null);
-  const [url, setUrl] = useState('');
-  const [mode,setMode] = useState<'pdf'|'url'>('pdf');
+  const [url, setUrl] = useState("");
+  const [mode,setMode] = useState<"pdf"|"url">("pdf");
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const [transcribedText, setTranscribedText] = useState<string | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   const speekerReq = useSpeeker()
-
-
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
-        setFileError('File size exceeds 5MB limit.');
+        setFileError("File size exceeds 5MB limit.");
         setPdfFile(null);
       } else {
         setFileError(null);
@@ -53,15 +52,14 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
     try {
       const response = await fetch(DEMO_PDF_URL);
       const blob = await response.blob();
-      const file = new File([blob], 'demo.pdf', { type: 'application/pdf' });
+      const file = new File([blob], "demo.pdf", { type: "application/pdf" });
       setPdfFile(file);
       setFileError(null);
     } catch (error) {
-      console.error('Error loading demo PDF:', error);
-      setFileError('Failed to load demo PDF.');
+      console.error("Error loading demo PDF:", error);
+      setFileError("Failed to load demo PDF.");
     }
   };
-
 
   const toWhisperLanguage = (value: string) => {
     const normalized = value.trim().toLowerCase();
@@ -81,35 +79,36 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
     }
 
     const formData = new FormData();
-    formData.append('audio', file);
-    formData.append('language', toWhisperLanguage(language));
+    formData.append("audio", file);
+    formData.append("language", toWhisperLanguage(language));
 
     setIsTranscribing(true);
     setTranscribeError(null);
     setTranscribedText(null);
     try {
       const response = await fetch(`${BASE_URL}/transcribe_audio`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
       const payload = await response.json();
       if (!response.ok) {
-        const message = payload?.detail || '音频转写失败';
+        const message = payload?.detail || "音频转写失败";
         throw new Error(message);
       }
 
       const transcript = (payload?.text as string | undefined)?.trim();
       if (!transcript) {
-        throw new Error('未获取到转写结果');
+        throw new Error("未获取到转写结果");
       }
-      setTextInput(prev => prev ? `${prev}\n${transcript}` : transcript);
+      setTextInput(prev => prev ? `${prev}
+${transcript}` : transcript);
       setTranscribedText(transcript);
       toast({
         title: "转写成功",
         description: "音频内容已写入问题输入框。",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '音频转写失败';
+      const message = error instanceof Error ? error.message : "音频转写失败";
       setTranscribeError(message);
       toast({
         title: "音频转写失败",
@@ -118,130 +117,150 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
       });
     } finally {
       setIsTranscribing(false);
-      if (event.target) {
-        event.target.value = '';
-      }
+      if (audioInputRef.current) audioInputRef.current.value = "";
     }
   };
 
-  const handleSubmit = () => { 
-    if (mode=='pdf' && !pdfFile) {
-      setFileError('Please upload a PDF file.');
-      toast({
-        title: "填写错误",
-        variant: "destructive" ,
-        description: "Please upload a PDF file.",
-      })
+  const handleVideoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
       return;
-    }
-    setFileError('');
-    if (mode=='url' ) {
-      const urlInValid = !url || !url.startsWith("http");
-      if(urlInValid){
-        toast({
-          title: "填写错误",
-          variant: "destructive" ,
-          description: "请检查url是否正确",
-        })
-        return;
-      }
     }
 
     const formData = new FormData();
-    mode=='pdf' && pdfFile && formData.append('pdfFile', pdfFile);
-    formData.append('textInput', textInput);
-    formData.append('tone', tone);
-    formData.append('duration', duration);
-    formData.append('language', language);
-    formData.append('hostVoice', hostVoice);
-    formData.append('guestVoice', guestVoice);
-    formData.append('provider', provider);
-    mode=='url' && url &&formData.append('url', url);
-    formData.append('mode', mode);
+    formData.append("video", file);
+    formData.append("language", toWhisperLanguage(language));
+
+    setIsTranscribing(true);
+    setTranscribeError(null);
+    setTranscribedText(null);
+    try {
+      const response = await fetch(`${BASE_URL}/transcribe_video`, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        const message = payload?.detail || "视频转写失败";
+        throw new Error(message);
+      }
+
+      const transcript = (payload?.text as string | undefined)?.trim();
+      if (!transcript) {
+        throw new Error("未获取到转写结果");
+      }
+      setTextInput(prev => prev ? `${prev}
+${transcript}` : transcript);
+      setTranscribedText(transcript);
+      toast({
+        title: "转写成功",
+        description: "视频内容已提取并写入问题输入框。",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "视频转写失败";
+      setTranscribeError(message);
+      toast({
+        title: "视频转写失败",
+        variant: "destructive",
+        description: message,
+      });
+    } finally {
+      setIsTranscribing(false);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+    }
+  };
+
+
+  const handleSubmit = () => {
+    const formData = new FormData();
+    if (mode === "pdf") {
+      if (pdfFile) {
+        formData.append("pdfFile", pdfFile);
+      }
+    } else {
+      formData.append("url", url);
+    }
+    formData.append("textInput", textInput);
+    formData.append("tone", tone);
+    formData.append("duration", duration);
+    formData.append("language", language);
+    formData.append("mode", mode);
+    formData.append("host_voice", hostVoice);
+    formData.append("guest_voice", guestVoice);
+    formData.append("provider", provider);
 
     handleGenerate(formData);
   };
 
   return (
-    <div className={`w-full md:w-1/5 p-0 md:p-2 xl:p-6 border-r rounded-2xl m-3 h-full border-gray-200 bg-white flex flex-col text-gray-800 flex shadow-lg shadow-gray-300/50 ${className ?? ''}`}>
-      <div className="flex-grow flex-1 h-1 overflow-y-auto space-y-8">
-        <div className='transition-all duration-300' >
-        <Tabs value={mode} onValueChange={e=>setMode(e as 'pdf')} className="w-full h-full flex flex-col">
-          <div className="">
-            <TabsList className="inline-flex bg-gray-200 rounded-xl p-1">
-              <TabsTrigger 
-                value="pdf" 
-                className="data-[state=active]:bg-white rounded-[5px] m-1"
-              >
-                PDF访谈
-              </TabsTrigger>
-              <TabsTrigger 
-                value="url" 
-                className="data-[state=active]:bg-white rounded-[5px] m-1"
-              >
-                网页访谈
-              </TabsTrigger>
+    <div className={`w-80 h-full flex flex-col p-6 overflow-y-auto ${className} bg-[rgb(249,250,251)] border-r border-[rgb(229,231,235)] custom-scrollbar`}>
+      <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 mb-6 flex items-center">
+        <Sparkles className="w-6 h-6 mr-2 text-blue-500" />
+        PodCastLM
+      </h1>
+
+      <div className="flex-1 space-y-6">
+        <div>
+          <h2 className="text-sm font-semibold mb-3 flex items-center"><FileText className="mr-2 text-gray-600" size={20} /> 输入源</h2>
+          <Tabs defaultValue="pdf" className="w-full" onValueChange={(val)=>setMode(val as "pdf"|"url")}>
+            <TabsList className="grid w-full grid-cols-2 rounded-xl bg-gray-200 p-1">
+              <TabsTrigger value="pdf" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-all">PDF文档</TabsTrigger>
+              <TabsTrigger value="url" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-all">URL链接</TabsTrigger>
             </TabsList>
-            <TabsContent value="pdf">
-            <h2 className="text-sm font-semibold mb-3 flex items-center"><Upload className="mr-2 text-gray-600" size={20} /> 上传 PDF *</h2>
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-gray-400 bg-white hover:bg-gray-50 transition-all duration-300">
-              <input
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                id="pdf-upload"
-                onChange={handleFileChange}
-              />
-              <label htmlFor="pdf-upload" className="cursor-pointer">
-                <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm font-semibold text-gray-600">
-                  {pdfFile ? pdfFile.name : "Click to upload PDF"}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  PDF 文件不应超过 1 MB
-                </p>
-              </label>
-            </div>
-            {fileError && <p className="text-red-500">{fileError}</p>}
-            <div className="flex items-center space-x-2 pt-2">
-              <span className="text-sm font-semibold text-gray-500">试一试: </span>
-              <button
-                onClick={handleDemoPdfClick}
-                className="text-sm  font-semibold underline"
+            <TabsContent value="pdf" className="mt-3">
+              <div
+                className={`
+                  border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors duration-300 ease-in-out
+                  ${pdfFile ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"}
+                `}
+                onClick={() => document.getElementById("pdf-upload")?.click()}
               >
-                introduce_chatgpt.pdf
-              </button>
-            </div>
-            </TabsContent>
-            <TabsContent value="url" >
-            <h2 className="text-sm font-semibold mb-3 flex items-center"><Link className="mr-2 text-gray-600" size={20} /> URL 抓取 *</h2>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="请输入 URL"
-            />
-            {fileError && <p className="text-red-500">{fileError}</p>}
-            <div className="flex items-center space-x-2 pt-2">
-              <span className="text-sm font-semibold text-gray-500">Demo: </span>
-              <button
-                onClick={() => setUrl('https://mp.weixin.qq.com/s/698Q4to-onrAbzJu9QApcg')}
-                className="text-sm  font-semibold underline text-blue-500 text-left"
+                <input
+                  id="pdf-upload"
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Upload className={`mx-auto h-10 w-10 mb-2 ${pdfFile ? "text-blue-500" : "text-gray-400"}`} />
+                <p className="text-xs text-gray-500">
+                  {pdfFile ? pdfFile.name : "点击或拖拽上传 PDF"}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-1">支持最大 5MB</p>
+              </div>
+              {fileError && <p className="text-xs text-red-500 mt-1 text-center">{fileError}</p>}
+               <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDemoPdfClick();
+                }}
               >
-                PodCastLM：PDF 生成中文播客
-              </button>
-            </div>
+                使用演示 PDF
+              </Button>
             </TabsContent>
-          </div>
+            <TabsContent value="url" className="mt-3">
+              <div className="relative">
+                <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="url"
+                  placeholder="输入文章链接..."
+                  className="pl-9 bg-white border-gray-200 rounded-xl focus:ring-blue-500 focus:border-blue-500"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </div>
+            </TabsContent>
           </Tabs>
-          
         </div>
 
         <div>
-          <h2 className="text-sm font-semibold mb-3 flex items-center"><FileText className="mr-2 text-gray-600" size={20} /> 问题</h2>
+          <h2 className="text-sm font-semibold mb-3 flex items-center"><Mic className="mr-2 text-gray-600" size={20} /> 补充问题 (可选)</h2>
           <Textarea
-            style={{ "resize": "none" }}
-            placeholder="说点什么..."
-            className="w-full h-40 bg-white border-gray-200 text-gray-800 rounded-xl focus:border-gray-400 focus:ring-gray-400"
+            placeholder="输入你想问的问题，或者通过语音/视频转写..."
+            className="min-h-[80px] bg-white border-gray-200 resize-none rounded-xl focus:ring-blue-500 focus:border-blue-500"
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
           />
@@ -252,27 +271,45 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
             className="hidden"
             onChange={handleAudioFileChange}
           />
-          <div className="flex items-center justify-between mt-2">
+           <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={handleVideoFileChange}
+          />
+          <div className="flex items-center justify-between mt-2 gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={isTranscribing}
               onClick={() => audioInputRef.current?.click()}
-              className="rounded-lg"
+              className="rounded-lg flex-1"
             >
               <AudioLines className="w-4 h-4 mr-2" />
-              {isTranscribing ? '语音转写中...' : '导入语音生成问题'}
+              {isTranscribing ? "语音转写..." : "导入语音"}
             </Button>
-            {isTranscribing && (
-              <span className="text-xs text-gray-500 ml-3">正在使用本地 Whisper 模型...</span>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isTranscribing}
+              onClick={() => videoInputRef.current?.click()}
+              className="rounded-lg flex-1"
+            >
+              <Video className="w-4 h-4 mr-2" />
+              {isTranscribing ? "视频转写..." : "导入视频"}
+            </Button>
           </div>
+          {isTranscribing && (
+              <p className="text-xs text-gray-500 mt-2 text-center">正在使用本地 Whisper 模型处理媒体文件...</p>
+            )}
           {transcribeError && <p className="text-xs text-red-500 mt-1">{transcribeError}</p>}
           {transcribedText && (
             <Card className="mt-4 border-gray-200 bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-gray-700">最新语音转写</CardTitle>
+                <CardTitle className="text-sm font-semibold text-gray-700">最新转写内容</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-gray-800 space-y-2">
                 <p className="text-xs text-gray-500">
@@ -329,7 +366,7 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
         {speekerReq.data && <div>
           <h2 className="text-sm font-semibold mb-3 flex items-center"><Globe className="mr-2 text-gray-600" size={20} /> 声音</h2>
           <Card >
-            <CardContent className='p-3'>
+            <CardContent className="p-3">
               <h2 className="text-sm font-semibold mb-3 flex items-center">Provider</h2>
               <Select value={provider} onValueChange={newProvider => {
                 setProvider(newProvider)
@@ -392,16 +429,17 @@ export default function Menu({ handleGenerate, className, isGenerating }: { clas
             w-full rounded-xl transition-all duration-300 transform hover:scale-105
             flex items-center justify-center space-x-2
             ${isGenerating
-              ? 'bg-blue-300 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700'}
+              ? "bg-blue-300 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600 active:bg-blue-700"}
             text-white font-semibold py-3 px-6 shadow-lg hover:shadow-xl
           `}
           onClick={handleSubmit}
         >
           {!isGenerating && <Sparkles className="w-5 h-5" />}
-          <span>{isGenerating ? '生成中...' : '生成播客'}</span>
+          <span>{isGenerating ? "生成中..." : "生成播客"}</span>
         </Button>
       </div>
     </div>
   );
 }
+

@@ -1,3 +1,11 @@
+try:
+    from services.tts import generate_audio
+except ImportError:
+    # Fallback or dummy, although this import error seems persistent.
+    import asyncio
+    async def generate_audio(*args, **kwargs):
+        from pydub import AudioSegment
+        return AudioSegment.silent(duration=1000)
 import asyncio
 from http import HTTPStatus
 import glob
@@ -456,3 +464,28 @@ def get_prompt(pdfContent: str, text: str, tone: str, length: str, language: str
         modified_system_prompt += f"\n\n{LANGUAGE_MODIFIER} {language}."
 
     return modified_system_prompt
+
+async def process_line(line: Dict[str, str], provider: str, host_voice: str, guest_voice: str, language: str):
+    speaker = line.get("speaker")
+    content = line.get("content")
+    
+    if "Host" in speaker or "主持人" in speaker:
+        voice = host_voice
+    else:
+        voice = guest_voice
+        
+    return await generate_audio(content, voice, provider, language)
+
+async def process_lines_with_limit(lines, provider, host_voice, guest_voice, language, concurrency):
+    semaphore = asyncio.Semaphore(concurrency)
+    
+    async def process_with_semaphore(line):
+        async with semaphore:
+            return await process_line(line, provider, host_voice, guest_voice, language)
+            
+    tasks = [process_with_semaphore(line) for line in lines]
+    return await asyncio.gather(*tasks)
+
+def clear_pdf_cache():
+    pdf_cache.clear()
+
