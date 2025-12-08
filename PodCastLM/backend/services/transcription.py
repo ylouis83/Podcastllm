@@ -110,6 +110,62 @@ class TranscriptionService:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _run_transcription)
 
+
+    def extract_audio_from_video(self, video_path: Path) -> Path:
+        """Extract audio from a video file using moviepy."""
+        from moviepy import VideoFileClip
+        
+        try:
+            video = VideoFileClip(str(video_path))
+            audio_path = video_path.with_suffix(".mp3")
+            video.audio.write_audiofile(str(audio_path), logger=None)
+            video.close()
+            return audio_path
+        except Exception as e:
+            logger.error(f"Error extracting audio from video: {e}")
+            raise ValueError(f"Failed to extract audio from video: {e}")
+
+    async def transcribe_video_upload(self, video_file: UploadFile, *, language: Optional[str] = None) -> TranscriptionResult:
+        """Transcribe an uploaded video file by extracting audio first."""
+        contents = await video_file.read()
+        await video_file.seek(0)
+        
+        if not contents:
+            raise ValueError("Video file is empty or cannot be read.")
+            
+        suffix = Path(video_file.filename or "").suffix or ".mp4"
+        
+        def _run_video_transcription() -> TranscriptionResult:
+            tmp_video_path: Optional[Path] = None
+            tmp_audio_path: Optional[Path] = None
+            try:
+                # Save video to temp file
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+                    tmp_file.write(contents)
+                    tmp_video_path = Path(tmp_file.name)
+                
+                # Extract audio
+                tmp_audio_path = self.extract_audio_from_video(tmp_video_path)
+                
+                # Transcribe audio
+                return self._transcribe_path(tmp_audio_path, language=language)
+            finally:
+                # Cleanup
+                if tmp_video_path and tmp_video_path.exists():
+                    try:
+                        tmp_video_path.unlink()
+                    except OSError as exc:
+                        logger.warning("Failed to remove temp video file %s: %s", tmp_video_path, exc)
+                if tmp_audio_path and tmp_audio_path.exists():
+                    try:
+                        tmp_audio_path.unlink()
+                    except OSError as exc:
+                        logger.warning("Failed to remove temp audio file %s: %s", tmp_audio_path, exc)
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _run_video_transcription)
+
+
     def transcribe_local_file(self, audio_path: Path, *, language: Optional[str] = None) -> TranscriptionResult:
         """Synchronously transcribe a local audio file."""
         audio_path = audio_path.expanduser().resolve()
@@ -127,3 +183,4 @@ def get_transcription_service() -> TranscriptionService:
     if _SERVICE is None:
         _SERVICE = TranscriptionService(model_name=os.getenv("WHISPER_MODEL_NAME", WHISPER_MODEL_NAME))
     return _SERVICE
+

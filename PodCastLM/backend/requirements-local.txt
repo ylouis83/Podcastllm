@@ -27,3 +27,4 @@ diskcache
 celery
 redis
 fish_audio_sdk
+moviepy

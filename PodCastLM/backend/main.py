@@ -13,7 +13,7 @@ from api.main import api_router
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=False)
 load_dotenv(override=False)
 
-app = FastAPI(title="PodCastLM", version="1.0.0")
+app = FastAPI(title="PodCastLM", version="1.0.1")
 
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 app.mount("/audio", StaticFiles(directory=AUDIO_CACHE_DIR), name="audio")

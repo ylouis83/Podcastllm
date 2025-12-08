@@ -84,6 +84,19 @@ async def transcribe_audio(
     return JSONResponse({"text": result.text})
 
 
+@router.post("/transcribe_video")
+async def transcribe_video(
+    video: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+):
+    try:
+        normalized = _normalize_language(language)
+        result = await transcription_service.transcribe_video_upload(video, language=normalized)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return JSONResponse({"text": result.text})
 @router.get("/test")
 def test():
     return {"message": "Hello World"}

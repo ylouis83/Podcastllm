@@ -11,14 +11,14 @@
 ## 功能概览
 - 支持 PDF 上传或 URL 抓取（Jina 抓取）生成播客脚本、摘要与节目简介。
 - 多路 TTS：FishAudio、Azure Speech、Qwen3 TTS，前端可切换主持人/嘉宾音色。
-- 本地 Whisper 转写：前端直接上传音频，或用 CLI 批量转写并导出时间戳文本。
+- 本地 Whisper 转写：前端直接上传音频/视频，自动提取音频并识别内容；支持 CLI 批量处理。
 - 流式响应：对话生成、摘要、信息流均以流式返回，前端实时渲染。
 - 技术栈：FastAPI + React + Tailwind，后端提供 `/api/v1/chat/*` API。
 
 ## 快速开始
 
 ### 前置依赖
-- Python 3.9+、Node.js 18+（推荐搭配 pnpm）、ffmpeg（pydub 导出 MP3 需要）。
+- Python 3.9+、Node.js 18+（推荐搭配 pnpm）、ffmpeg（pydub/moviepy 需要）。
 - 首次转写会自动下载 Whisper 模型，可通过 `WHISPER_MODEL_NAME` 选择体量。
 
 ### 后端
@@ -55,7 +55,7 @@ pnpm dev --host
 - `POST /api/v1/chat/summarize`：生成摘要（流式）。
 - `POST /api/v1/chat/pod_info`：生成节目简介与要点。
 - `POST /api/v1/chat/transcribe_audio`：上传音频并用本地 Whisper 转写。
-- `POST /api/v1/chat/generate_audio`：按对话文本生成音频，返回 `task_id`；`GET /api/v1/chat/audio_status/{task_id}` 查询结果。
+- `POST /api/v1/chat/transcribe_video`：上传视频文件并提取音频进行转写。- `POST /api/v1/chat/generate_audio`：按对话文本生成音频，返回 `task_id`；`GET /api/v1/chat/audio_status/{task_id}` 查询结果。
 - `GET /api/v1/chat/speekers`：获取可选音色列表。
 
 ## 本地转写 CLI
